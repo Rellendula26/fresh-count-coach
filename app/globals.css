@@ -24,3 +24,37 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ───────── Subtle music notes background ───────── */
+
+.notes-bg {
+  position: fixed;
+  inset: -15%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.12;
+}
+
+.notes-bg::before {
+  content: "♪ ♫ ♩ ♬ ♪ ♫ ♩ ♬ ♪ ♫ ♩ ♬ ♪ ♫ ♩ ♬";
+  position: absolute;
+  inset: 0;
+  font-size: 16px;
+  letter-spacing: 42px;
+  line-height: 4.5;
+  color: rgba(0, 0, 0, 0.25);
+  transform: rotate(-12deg);
+  white-space: pre-wrap;
+  user-select: none;
+  mix-blend-mode: multiply;
+
+  -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
+  mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .notes-bg::before {
+    color: rgba(255, 255, 255, 0.25);
+    mix-blend-mode: screen;
+  }
+}
