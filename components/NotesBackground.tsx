@@ -1,36 +1,51 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Note = {
-  id: number;
-  x: number; // vw
-  y: number; // vh
+  id: string;
+  char: string;
+  left: number; // %
+  top: number; // %
   size: number; // px
-  drift: number; // px
-  duration: number; // s
+  dur: number; // s
   delay: number; // s
+  drift: number; // px
+  rot: number; // deg
   opacity: number; // 0..1
-  symbol: string;
 };
 
-const SYMBOLS = ["♪", "♫", "♩", "♬"];
+const CHARS = ["♪", "♫", "♩", "♬"];
 
-export default function NotesBackground({ count = 18 }: { count?: number }) {
+function rand(min: number, max: number) {
+  return Math.random() * (max - min) + min;
+}
+
+export default function NotesBackground({ count = 22 }: { count?: number }) {
+  const [mounted, setMounted] = useState(false);
+
+  // Only render after mount -> no server/client mismatch
+  useEffect(() => setMounted(true), []);
+
   const notes = useMemo<Note[]>(() => {
-    // deterministic-ish random (fine for UI)
     return Array.from({ length: count }).map((_, i) => {
-      const x = Math.random() * 100;
-      const y = Math.random() * 100;
-      const size = 18 + Math.random() * 42; // 18..60
-      const drift = 12 + Math.random() * 38; // 12..50
-      const duration = 10 + Math.random() * 18; // 10..28
-      const delay = Math.random() * 6; // 0..6
-      const opacity = 0.08 + Math.random() * 0.12; // subtle
-      const symbol = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
-      return { id: i, x, y, size, drift, duration, delay, opacity, symbol };
+      const char = CHARS[Math.floor(rand(0, CHARS.length))];
+      return {
+        id: `${i}-${Math.random().toString(16).slice(2)}`,
+        char,
+        left: rand(2, 98),
+        top: rand(5, 95),
+        size: rand(18, 52),
+        dur: rand(8, 16),
+        delay: rand(0, 6),
+        drift: rand(-22, 22),
+        rot: rand(-18, 18),
+        opacity: rand(0.10, 0.22),
+      };
     });
   }, [count]);
+
+  if (!mounted) return null;
 
   return (
     <div className="notes-bg" aria-hidden>
@@ -39,17 +54,18 @@ export default function NotesBackground({ count = 18 }: { count?: number }) {
           key={n.id}
           className="note"
           style={{
-            left: `${n.x}vw`,
-            top: `${n.y}vh`,
+            left: `${n.left}%`,
+            top: `${n.top}%`,
             fontSize: `${n.size}px`,
             opacity: n.opacity,
-            animationDuration: `${n.duration}s`,
+            animationDuration: `${n.dur}s`,
             animationDelay: `${n.delay}s`,
-            // pass drift via CSS var
+            // custom CSS vars used by keyframes
             ["--drift" as any]: `${n.drift}px`,
+            ["--r" as any]: `${n.rot}deg`,
           }}
         >
-          {n.symbol}
+          {n.char}
         </span>
       ))}
     </div>

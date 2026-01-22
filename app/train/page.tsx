@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import WaveformRange from "@/components/WaveformRange";
 import TapTrainer from "@/components/TapTrainer";
 import Metronome from "@/components/Metronome";
-import { estimateTempoFromAudioUrlRange } from "@/lib/tempo";
+import { estimateTempoFromAudioFileRange } from "@/lib/tempo";
 
 type Range = { start: number; end: number };
 
@@ -17,6 +17,8 @@ export default function TrainPage() {
   const [bpm, setBpm] = useState<number | null>(null);
   const [tempoStatus, setTempoStatus] = useState<string>("");
   const [apiStatus, setApiStatus] = useState<string>("");
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+
 
   // tiny “backend” call (optional, but proves API works)
   useEffect(() => {
@@ -35,7 +37,7 @@ export default function TrainPage() {
     setRange(r);
     setBpm(null);
 
-    if (!audioUrl || !r) {
+    if (!audioFile || !r) {
       setTempoStatus("");
       return;
     }
@@ -43,7 +45,7 @@ export default function TrainPage() {
     setTempoStatus("Detecting BPM...");
     try {
       const { bpm: detectedBpm, confidence } =
-        await estimateTempoFromAudioUrlRange(audioUrl, r);
+        await estimateTempoFromAudioFileRange(audioFile, r);
 
       setBpm(detectedBpm);
       setTempoStatus(
@@ -103,6 +105,8 @@ export default function TrainPage() {
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (!f) return;
+                  
+                  setAudioFile(f);
 
                   const url = URL.createObjectURL(f);
                   setAudioUrl(url);

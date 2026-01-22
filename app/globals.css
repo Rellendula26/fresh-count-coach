@@ -108,3 +108,27 @@ body {
   }
 }
 
+.notes-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.note {
+  position: absolute;
+  animation: noteFloat var(--dur, 12s) ease-in-out infinite;
+}
+
+@keyframes noteFloat {
+  0% {
+    transform: translateY(0) translateX(0) rotate(var(--r));
+  }
+  50% {
+    transform: translateY(calc(var(--drift) * -1)) translateX(6px)
+      rotate(calc(var(--r) + 4deg));
+  }
+  100% {
+    transform: translateY(0) translateX(0) rotate(var(--r));
+  }
+}

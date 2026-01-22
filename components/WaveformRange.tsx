@@ -13,7 +13,6 @@ function parseTime(input: string): number | null {
   const s = input.trim();
   if (!s) return null;
 
-  // allow "mm:ss" or "m:ss.xx" or plain seconds "12.3"
   if (s.includes(":")) {
     const [mStr, secStr] = s.split(":");
     const m = Number(mStr);
@@ -43,21 +42,32 @@ export default function WaveformRange({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const wsRef = useRef<WaveSurfer | null>(null);
 
+  // ✅ refs to avoid stale closure in timers
+  const rangeRef = useRef<Range | null>(null);
+  const loopRef = useRef<boolean>(true);
+
   const [isReady, setIsReady] = useState(false);
   const [duration, setDuration] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [loop, setLoop] = useState(true);
 
-  // "source of truth" for range
   const [range, setRange] = useState<Range | null>(null);
-
-  // inputs (strings)
   const [startText, setStartText] = useState("");
   const [endText, setEndText] = useState("");
 
   const disabled = useMemo(() => !audioUrl, [audioUrl]);
 
-  // Create/destroy wavesurfer
+  // keep refs synced
+  useEffect(() => {
+    rangeRef.current = range;
+    onRangeChange(range);
+  }, [range, onRangeChange]);
+
+  useEffect(() => {
+    loopRef.current = loop;
+  }, [loop]);
+
+  // Create/destroy WaveSurfer when audioUrl changes
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -67,10 +77,10 @@ export default function WaveformRange({
     setIsReady(false);
     setIsPlaying(false);
     setDuration(0);
+
     setRange(null);
     setStartText("");
     setEndText("");
-    onRangeChange(null);
 
     if (!audioUrl) return;
 
@@ -88,49 +98,51 @@ export default function WaveformRange({
 
     ws.on("ready", () => {
       setIsReady(true);
-      const d = ws.getDuration();
-      setDuration(d);
+      setDuration(ws.getDuration());
     });
 
     ws.on("play", () => setIsPlaying(true));
     ws.on("pause", () => setIsPlaying(false));
 
-    // Loop enforcement: if playhead goes outside the range, snap back
-    const interval = window.setInterval(() => {
-      const w = wsRef.current;
-      if (!w) return;
-      if (!loop) return;
-      if (!range) return;
-      if (!w.isPlaying()) return;
+    ws.on("error", (e) => {
+      console.error("WaveSurfer error:", e);
+      setIsReady(false);
+    });
 
-      const t = w.getCurrentTime();
-      if (t < range.start || t > range.end) {
-        w.setTime(range.start);
+    return () => {
+      ws.destroy();
+    };
+  }, [audioUrl]);
+
+  // ✅ Loop enforcement (uses refs so it always sees newest range/loop)
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const ws = wsRef.current;
+      const r = rangeRef.current;
+
+      if (!ws) return;
+      if (!ws.isPlaying()) return;
+      if (!loopRef.current) return;
+      if (!r) return;
+
+      const t = ws.getCurrentTime();
+      if (t < r.start || t > r.end) {
+        ws.setTime(r.start);
       }
     }, 80);
 
-    return () => {
-      window.clearInterval(interval);
-      ws.destroy();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [audioUrl]);
-
-  // Keep parent informed
-  useEffect(() => {
-    onRangeChange(range);
-  }, [range, onRangeChange]);
+    return () => window.clearInterval(interval);
+  }, []);
 
   function togglePlay() {
     const ws = wsRef.current;
     if (!ws || !isReady) return;
 
-    // If range exists and loop is on, ensure we start inside range
-    if (range && loop) {
+    const r = rangeRef.current;
+
+    if (r && loopRef.current) {
       const t = ws.getCurrentTime();
-      if (t < range.start || t > range.end) {
-        ws.setTime(range.start);
-      }
+      if (t < r.start || t > r.end) ws.setTime(r.start);
     }
 
     ws.playPause();
@@ -145,15 +157,13 @@ export default function WaveformRange({
   function setStartFromPlayhead() {
     const ws = wsRef.current;
     if (!ws || !isReady) return;
-    const t = ws.getCurrentTime();
-    setStartText(fmt(t));
+    setStartText(fmt(ws.getCurrentTime()));
   }
 
   function setEndFromPlayhead() {
     const ws = wsRef.current;
     if (!ws || !isReady) return;
-    const t = ws.getCurrentTime();
-    setEndText(fmt(t));
+    setEndText(fmt(ws.getCurrentTime()));
   }
 
   function applyRange() {
@@ -165,16 +175,15 @@ export default function WaveformRange({
 
     let start = clamp(s, 0, duration);
     let end = clamp(e, 0, duration);
-
     if (end < start) [start, end] = [end, start];
-
-    // guard against tiny ranges
     if (end - start < 0.1) return;
 
     setRange({ start, end });
+
+    // ✅ makes it feel responsive: jump to start immediately
+    wsRef.current?.setTime(start);
   }
 
-  // Highlight overlay geometry
   const overlay = useMemo(() => {
     if (!range || duration <= 0) return null;
     const leftPct = (range.start / duration) * 100;
@@ -188,14 +197,10 @@ export default function WaveformRange({
         <div className="relative">
           <div ref={containerRef} />
 
-          {/* ✅ Visual highlight of selected range */}
           {overlay && (
             <div
               className="pointer-events-none absolute top-0 h-full rounded-md border border-blue-500 bg-blue-500/15"
-              style={{
-                left: `${overlay.leftPct}%`,
-                width: `${overlay.widthPct}%`,
-              }}
+              style={{ left: `${overlay.leftPct}%`, width: `${overlay.widthPct}%` }}
             />
           )}
         </div>
@@ -238,7 +243,6 @@ export default function WaveformRange({
         )}
       </div>
 
-      {/* ✅ Range controls (reliable) */}
       <div className="flex flex-col gap-2 rounded-lg border bg-white p-3 sm:flex-row sm:items-center">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-slate-700">Start</span>
@@ -253,7 +257,6 @@ export default function WaveformRange({
             className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
             onClick={setStartFromPlayhead}
             disabled={disabled || !isReady}
-            title="Use current playhead time as Start"
           >
             Set Start
           </button>
@@ -272,7 +275,6 @@ export default function WaveformRange({
             className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
             onClick={setEndFromPlayhead}
             disabled={disabled || !isReady}
-            title="Use current playhead time as End"
           >
             Set End
           </button>
@@ -283,7 +285,6 @@ export default function WaveformRange({
             className="rounded-lg bg-slate-800 px-4 py-2 text-white disabled:opacity-50"
             onClick={applyRange}
             disabled={disabled || !isReady}
-            title="Apply the Start/End range and highlight it"
           >
             Apply
           </button>
