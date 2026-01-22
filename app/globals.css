@@ -132,3 +132,38 @@ body {
     transform: translateY(0) translateX(0) rotate(var(--r));
   }
 }
+
+/* Floating music notes background */
+.notes-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.note {
+  position: absolute;
+  color: rgba(0, 0, 0, 0.14);
+  user-select: none;
+  opacity: 0.9;
+
+  animation-name: noteFloat;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+@keyframes noteFloat {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(var(--r, 0deg));
+  }
+  50% {
+    transform: translate3d(var(--drift, 14px), -22px, 0) rotate(var(--r, 0deg));
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotate(var(--r, 0deg));
+  }
+}
+
+
