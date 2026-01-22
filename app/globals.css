@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
+/* Theme tokens */
 :root {
-  --background: #ffffff;
+  --background: #f3f4f6; /* light gray */
   --foreground: #171717;
 }
 
@@ -19,42 +20,91 @@
   }
 }
 
+/* Base */
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* ───────── Subtle music notes background ───────── */
+/* =========================
+   Floating music notes layer
+   (used by NotesBackground.tsx)
+   ========================= */
 
 .notes-bg {
   position: fixed;
-  inset: -15%;
-  z-index: 0;
+  inset: 0;
   pointer-events: none;
-  opacity: 0.12;
+  z-index: 0;
+  overflow: hidden;
 }
 
-.notes-bg::before {
-  content: "♪ ♫ ♩ ♬ ♪ ♫ ♩ ♬ ♪ ♫ ♩ ♬ ♪ ♫ ♩ ♬";
+.note {
   position: absolute;
-  inset: 0;
-  font-size: 16px;
-  letter-spacing: 42px;
-  line-height: 4.5;
-  color: rgba(0, 0, 0, 0.25);
-  transform: rotate(-12deg);
-  white-space: pre-wrap;
+  color: rgba(0, 0, 0, 0.18);
+  opacity: 0.85;
+  filter: blur(0.1px);
   user-select: none;
-  mix-blend-mode: multiply;
+  will-change: transform, opacity;
 
-  -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
-  mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
+  animation-name: noteFloat;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+@keyframes noteFloat {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(var(--r, 0deg));
+  }
+  50% {
+    transform: translate3d(14px, -18px, 0) rotate(var(--r, 0deg));
+    opacity: 0.65;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotate(var(--r, 0deg));
+  }
 }
 
 @media (prefers-color-scheme: dark) {
-  .notes-bg::before {
-    color: rgba(255, 255, 255, 0.25);
-    mix-blend-mode: screen;
+  .note {
+    color: rgba(255, 255, 255, 0.14);
   }
 }
+
+.notes-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.note {
+  position: absolute;
+  color: rgba(0, 0, 0, 0.22); /* darker so you can SEE it */
+  user-select: none;
+  will-change: transform, opacity;
+  filter: blur(0.15px);
+
+  animation: noteFloat ease-in-out infinite;
+}
+
+@keyframes noteFloat {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(var(--r, 0deg));
+  }
+  50% {
+    transform: translate3d(var(--drift, 10px), -22px, 0) rotate(var(--r, 0deg));
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotate(var(--r, 0deg));
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .note {
+    color: rgba(255, 255, 255, 0.16);
+  }
+}
+

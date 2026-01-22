@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+
+import NotesBackground from "@/components/NotesBackground";
 import GlowCursor from "@/components/GlowCursor";
 
 const geistSans = Geist({
@@ -15,23 +17,18 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Count Coach",
-  description: "Train musical timing with anchored looping and tap analysis.",
+  description: "Dance-mix timing trainer",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {/* Glowing cursor overlay */}
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#f7f7f8]`}>
+        <NotesBackground count={22} />
         <GlowCursor />
 
-        {children}
+        {/* foreground content */}
+        <div className="relative z-10">{children}</div>
       </body>
     </html>
   );
