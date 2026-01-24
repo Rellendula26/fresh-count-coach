@@ -1,38 +1,29 @@
 // lib/tempo.ts
 export type TempoResult = { bpm: number; confidence: number };
 
-function clamp(n: number, a: number, b: number) {
-  return Math.max(a, Math.min(b, n));
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
 }
 
-/**
- * Very solid "first pass" tempo estimation for dance music:
- * - bandpass-ish by focusing on energy change (spectral flux-lite)
- * - compute onset envelope from short-time energy
- * - autocorrelate onset envelope to find periodicity
- */
-export async function estimateTempoFromAudioUrlRange(
-  audioUrl: string,
+export function estimateTempoFromAudioBufferRange(
+  audioBuf: AudioBuffer,
   range: { start: number; end: number }
-): Promise<TempoResult> {
-  const res = await fetch(audioUrl);
-  const arrayBuf = await res.arrayBuffer();
-
-  const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-  const audioBuf = await ctx.decodeAudioData(arrayBuf.slice(0));
-
+): TempoResult {
   const sr = audioBuf.sampleRate;
 
   const startS = clamp(range.start, 0, audioBuf.duration);
   const endS = clamp(range.end, 0, audioBuf.duration);
+
   const start = Math.floor(startS * sr);
   const end = Math.floor(endS * sr);
 
-  // mono mixdown
   const ch0 = audioBuf.getChannelData(0);
   const ch1 = audioBuf.numberOfChannels > 1 ? audioBuf.getChannelData(1) : null;
 
   const len = end - start;
+  if (len <= 0) return { bpm: 0, confidence: 0 };
+
+  // mono mixdown
   const mono = new Float32Array(len);
   for (let i = 0; i < len; i++) {
     const a = ch0[start + i];
@@ -40,158 +31,81 @@ export async function estimateTempoFromAudioUrlRange(
     mono[i] = 0.5 * (a + b);
   }
 
-  // Short-time energy envelope
+  // onset envelope from short-time energy change
   const win = 1024;
   const hop = 256;
-  const frames = Math.floor((mono.length - win) / hop);
+
+  const frames = Math.max(0, Math.floor((mono.length - win) / hop) + 1);
+  if (frames < 8) return { bpm: 0, confidence: 0 };
+
   const env = new Float32Array(frames);
 
   let prev = 0;
   for (let f = 0; f < frames; f++) {
     let sum = 0;
     const off = f * hop;
-    for (let j = 0; j < win; j++) {
-      const x = mono[off + j];
+    const stop = Math.min(off + win, mono.length);
+    for (let j = off; j < stop; j++) {
+      const x = mono[j];
       sum += x * x;
     }
-    // "onset-ish": positive energy change
-    const e = Math.sqrt(sum / win);
+    const denom = Math.max(1, stop - off);
+    const e = Math.sqrt(sum / denom);
     const diff = Math.max(0, e - prev);
     env[f] = diff;
     prev = e;
   }
 
-  // Normalize
+  // normalize envelope
   let max = 0;
   for (let i = 0; i < env.length; i++) max = Math.max(max, env[i]);
-  if (max > 0) for (let i = 0; i < env.length; i++) env[i] /= max;
+  if (max <= 1e-8) return { bpm: 0, confidence: 0 };
+  for (let i = 0; i < env.length; i++) env[i] /= max;
 
-  // Autocorrelation over plausible BPM range
-  // BPM 80..200 typical; convert to lag in frames
+  // autocorrelation over plausible BPM range
   const fps = sr / hop;
   const minBpm = 80;
   const maxBpm = 200;
 
-  const minLag = Math.floor((60 * fps) / maxBpm);
-  const maxLag = Math.floor((60 * fps) / minBpm);
+  const minLag = Math.max(1, Math.floor((60 * fps) / maxBpm));
+  const maxLag = Math.min(env.length - 1, Math.floor((60 * fps) / minBpm));
+  if (maxLag <= minLag) return { bpm: 0, confidence: 0 };
 
   let bestLag = minLag;
-  let bestScore = -1;
+  let bestScore = -Infinity;
+  let secondBest = -Infinity;
 
   for (let lag = minLag; lag <= maxLag; lag++) {
     let score = 0;
-    // correlate
-    for (let i = 0; i < env.length - lag; i++) {
-      score += env[i] * env[i + lag];
-    }
+    const lim = env.length - lag;
+    for (let i = 0; i < lim; i++) score += env[i] * env[i + lag];
+
     if (score > bestScore) {
+      secondBest = bestScore;
       bestScore = score;
       bestLag = lag;
+    } else if (score > secondBest) {
+      secondBest = score;
     }
   }
 
+  // BPM from best lag
   const bpmRaw = (60 * fps) / bestLag;
-
-  // Common half/double-time correction (dance mixes do this a lot)
   let bpm = bpmRaw;
+
+  // common half/double-time correction
   if (bpm < 90) bpm *= 2;
   if (bpm > 190) bpm /= 2;
 
-  // Confidence (simple)
-  const confidence = Math.min(1, bestScore / (env.length || 1));
+  // ✅ better confidence: "peakiness" of best autocorr peak vs runner-up
+  // raw: 0..1 where 0 means ambiguous, 1 means very dominant peak
+  const raw =
+    bestScore > 0 && Number.isFinite(secondBest)
+      ? (bestScore - secondBest) / bestScore
+      : 0;
 
-  // Close the temp context (release resources)
-  ctx.close().catch(() => {});
-
-  return { bpm: Math.round(bpm), confidence };
-}
-
-export async function estimateTempoFromAudioFileRange(
-  audioFile: File,
-  range: { start: number; end: number }
-): Promise<TempoResult> {
-  const arrayBuf = await audioFile.arrayBuffer();
-
-  const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-  const audioBuf = await ctx.decodeAudioData(arrayBuf.slice(0));
-
-  const sr = audioBuf.sampleRate;
-
-  const startS = clamp(range.start, 0, audioBuf.duration);
-  const endS = clamp(range.end, 0, audioBuf.duration);
-  const start = Math.floor(startS * sr);
-  const end = Math.floor(endS * sr);
-
-  // mono mixdown
-  const ch0 = audioBuf.getChannelData(0);
-  const ch1 = audioBuf.numberOfChannels > 1 ? audioBuf.getChannelData(1) : null;
-
-  const len = end - start;
-  const mono = new Float32Array(len);
-  for (let i = 0; i < len; i++) {
-    const a = ch0[start + i];
-    const b = ch1 ? ch1[start + i] : a;
-    mono[i] = 0.5 * (a + b);
-  }
-
-  // Short-time energy envelope
-  const win = 1024;
-  const hop = 256;
-  const frames = Math.floor((mono.length - win) / hop);
-  const env = new Float32Array(frames);
-
-  let prev = 0;
-  for (let f = 0; f < frames; f++) {
-    let sum = 0;
-    const off = f * hop;
-    for (let j = 0; j < win; j++) {
-      const x = mono[off + j];
-      sum += x * x;
-    }
-    // "onset-ish": positive energy change
-    const e = Math.sqrt(sum / win);
-    const diff = Math.max(0, e - prev);
-    env[f] = diff;
-    prev = e;
-  }
-
-  // Normalize
-  let max = 0;
-  for (let i = 0; i < env.length; i++) max = Math.max(max, env[i]);
-  if (max > 0) for (let i = 0; i < env.length; i++) env[i] /= max;
-
-  // Autocorrelation over plausible BPM range
-  const fps = sr / hop;
-  const minBpm = 80;
-  const maxBpm = 200;
-
-  const minLag = Math.floor((60 * fps) / maxBpm);
-  const maxLag = Math.floor((60 * fps) / minBpm);
-
-  let bestLag = minLag;
-  let bestScore = -1;
-
-  for (let lag = minLag; lag <= maxLag; lag++) {
-    let score = 0;
-    for (let i = 0; i < env.length - lag; i++) {
-      score += env[i] * env[i + lag];
-    }
-    if (score > bestScore) {
-      bestScore = score;
-      bestLag = lag;
-    }
-  }
-
-  const bpmRaw = (60 * fps) / bestLag;
-
-  // Common half/double-time correction
-  let bpm = bpmRaw;
-  if (bpm < 90) bpm *= 2;
-  if (bpm > 190) bpm /= 2;
-
-  const confidence = Math.min(1, bestScore / (env.length || 1));
-
-  ctx.close().catch(() => {});
+  // make it more human-friendly (optional): sqrt lifts mid-range values
+  const confidence = Math.max(0, Math.min(1, Math.pow(raw, 0.5)));
 
   return { bpm: Math.round(bpm), confidence };
 }

@@ -21,7 +21,7 @@ export default function HomePage() {
             
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/70 px-3 py-1 text-xs text-zinc-700">
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Dance-mix timing trainer
+              Dance-Mix timing trainer
             </div>
 
             <h1 className="text-4xl font-semibold tracking-tight text-zinc-900">
@@ -31,8 +31,7 @@ export default function HomePage() {
             <p className="mt-3 text-base leading-relaxed text-zinc-600">
               <span className="font-semibold text-zinc-800">Definition:</span>{" "}
               A practice tool that lets you isolate a specific segment of a mix,
-              lock the downbeat (“1”), and train your internal count with tap
-              feedback + a metronome.
+              ,and train your internal count with a metronome.
             </p>
 
             <p className="mt-3 text-base leading-relaxed text-zinc-600">
@@ -58,13 +57,13 @@ export default function HomePage() {
             <div className="mt-8 grid gap-3 sm:grid-cols-3">
               <MiniCard title="Range anchors" desc="Train only the part that matters." />
               <MiniCard title="Auto BPM" desc="Detect tempo from the selected segment." />
-              <MiniCard title="Tap feedback" desc="Lock “1”, tap Space, see timing stats." />
+              <MiniCard title="Metronome" desc="Creates a metronome, so that you can overlay the mix w/ a metronome" />
             </div>
           </div>
         </div>
 
         <div className="mx-auto mt-8 max-w-2xl text-center text-xs text-zinc-400">
-          Built for mixes with section-by-section tempo changes.
+          Built for mixes with section-by-section tempo changes. Such as those seen in DDN (Desi Dance Network)
         </div>
       </main>
     </div>

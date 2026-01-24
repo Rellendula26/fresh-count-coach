@@ -13,6 +13,7 @@ function parseTime(input: string): number | null {
   const s = input.trim();
   if (!s) return null;
 
+  // allow "mm:ss" or "m:ss.xx" or plain seconds "12.3"
   if (s.includes(":")) {
     const [mStr, secStr] = s.split(":");
     const m = Number(mStr);
@@ -42,9 +43,12 @@ export default function WaveformRange({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const wsRef = useRef<WaveSurfer | null>(null);
 
-  // ✅ refs to avoid stale closure in timers
+  // refs so timers always see latest values
   const rangeRef = useRef<Range | null>(null);
   const loopRef = useRef<boolean>(true);
+
+  // ✅ avoid re-triggering parent on every render (callback identity changes)
+  const onRangeChangeRef = useRef(onRangeChange);
 
   const [isReady, setIsReady] = useState(false);
   const [duration, setDuration] = useState<number>(0);
@@ -57,27 +61,37 @@ export default function WaveformRange({
 
   const disabled = useMemo(() => !audioUrl, [audioUrl]);
 
-  // keep refs synced
+  // Keep latest range in a ref (loop enforcement + play logic)
   useEffect(() => {
     rangeRef.current = range;
-    onRangeChange(range);
-  }, [range, onRangeChange]);
+  }, [range]);
+
+  // Keep latest onRangeChange callback without triggering effects every render
+  useEffect(() => {
+    onRangeChangeRef.current = onRangeChange;
+  }, [onRangeChange]);
+
+  // Notify parent ONLY when the range value changes
+  useEffect(() => {
+    onRangeChangeRef.current(range);
+  }, [range]);
 
   useEffect(() => {
     loopRef.current = loop;
   }, [loop]);
 
-  // Create/destroy WaveSurfer when audioUrl changes
+  // Create/destroy wavesurfer when audioUrl changes
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // kill previous instance
     wsRef.current?.destroy();
     wsRef.current = null;
 
+    // reset UI
     setIsReady(false);
     setIsPlaying(false);
     setDuration(0);
-
     setRange(null);
     setStartText("");
     setEndText("");
@@ -91,7 +105,6 @@ export default function WaveformRange({
       cursorWidth: 2,
       waveColor: "#cbd5e1",
       progressColor: "#2563eb",
-      url: audioUrl,
     });
 
     wsRef.current = ws;
@@ -109,12 +122,16 @@ export default function WaveformRange({
       setIsReady(false);
     });
 
+    // ✅ Cross-version reliable load
+    ws.load(audioUrl);
+
     return () => {
       ws.destroy();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioUrl]);
 
-  // ✅ Loop enforcement (uses refs so it always sees newest range/loop)
+  // Loop enforcement
   useEffect(() => {
     const interval = window.setInterval(() => {
       const ws = wsRef.current;
@@ -139,7 +156,6 @@ export default function WaveformRange({
     if (!ws || !isReady) return;
 
     const r = rangeRef.current;
-
     if (r && loopRef.current) {
       const t = ws.getCurrentTime();
       if (t < r.start || t > r.end) ws.setTime(r.start);
@@ -179,8 +195,6 @@ export default function WaveformRange({
     if (end - start < 0.1) return;
 
     setRange({ start, end });
-
-    // ✅ makes it feel responsive: jump to start immediately
     wsRef.current?.setTime(start);
   }
 
@@ -200,7 +214,10 @@ export default function WaveformRange({
           {overlay && (
             <div
               className="pointer-events-none absolute top-0 h-full rounded-md border border-blue-500 bg-blue-500/15"
-              style={{ left: `${overlay.leftPct}%`, width: `${overlay.widthPct}%` }}
+              style={{
+                left: `${overlay.leftPct}%`,
+                width: `${overlay.widthPct}%`,
+              }}
             />
           )}
         </div>
@@ -236,7 +253,9 @@ export default function WaveformRange({
         {range ? (
           <div className="text-sm text-slate-700">
             Range: <b>{fmt(range.start)}</b> → <b>{fmt(range.end)}</b>{" "}
-            <span className="text-slate-400">({(range.end - range.start).toFixed(2)}s)</span>
+            <span className="text-slate-400">
+              ({(range.end - range.start).toFixed(2)}s)
+            </span>
           </div>
         ) : (
           <div className="text-sm text-slate-500">Set start/end, then Apply.</div>

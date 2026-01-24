@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type Note = {
   id: string;
@@ -21,28 +21,23 @@ function rand(min: number, max: number) {
 }
 
 export default function NotesBackground({ count = 22 }: { count?: number }) {
-  const [mounted, setMounted] = useState(false);
+  const [notes, setNotes] = useState<Note[]>([]);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const notes: Note[] = useMemo(() => {
-    // IMPORTANT: don’t generate anything until after mount
-    if (!mounted) return [];
-
-    return Array.from({ length: count }).map((_, i) => ({
-      id: `${i}-${Math.random().toString(16).slice(2)}`,
-      char: CHARS[Math.floor(rand(0, CHARS.length))],
-      left: rand(-5, 105),
-      top: rand(-5, 105),
-      size: rand(18, 54),
-      dur: rand(10, 18),
-      delay: rand(0, 6),
-      rot: rand(-18, 18),
-      drift: rand(-22, 22),
-    }));
-  }, [mounted, count]);
+    setNotes(
+      Array.from({ length: count }).map((_, i) => ({
+        id: `${i}-${Math.random().toString(16).slice(2)}`,
+        char: CHARS[Math.floor(rand(0, CHARS.length))],
+        left: rand(-5, 105),
+        top: rand(-5, 105),
+        size: rand(18, 54),
+        dur: rand(10, 18),
+        delay: rand(0, 6),
+        rot: rand(-18, 18),
+        drift: rand(-22, 22),
+      }))
+    );
+  }, [count]);
 
   return (
     <div className="notes-bg" aria-hidden>

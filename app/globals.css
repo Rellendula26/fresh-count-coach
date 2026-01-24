@@ -35,18 +35,20 @@ body {
 .notes-bg {
   position: fixed;
   inset: 0;
-  pointer-events: none;
   z-index: 0;
+  pointer-events: none; /* CRITICAL: never block clicks */
   overflow: hidden;
 }
 
 .note {
   position: absolute;
-  color: rgba(0, 0, 0, 0.18);
-  opacity: 0.85;
-  filter: blur(0.1px);
   user-select: none;
+  pointer-events: none; /* extra safety */
   will-change: transform, opacity;
+
+  color: rgba(0, 0, 0, 0.22); /* visible but subtle */
+  opacity: 0.9;
+  filter: blur(0.15px);
 
   animation-name: noteFloat;
   animation-timing-function: ease-in-out;
@@ -56,49 +58,15 @@ body {
 @keyframes noteFloat {
   0% {
     transform: translate3d(0, 0, 0) rotate(var(--r, 0deg));
+    opacity: 0.9;
   }
   50% {
-    transform: translate3d(14px, -18px, 0) rotate(var(--r, 0deg));
-    opacity: 0.65;
+    transform: translate3d(var(--drift, 14px), -22px, 0) rotate(var(--r, 0deg));
+    opacity: 0.6;
   }
   100% {
     transform: translate3d(0, 0, 0) rotate(var(--r, 0deg));
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  .note {
-    color: rgba(255, 255, 255, 0.14);
-  }
-}
-
-.notes-bg {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  overflow: hidden;
-}
-
-.note {
-  position: absolute;
-  color: rgba(0, 0, 0, 0.22); /* darker so you can SEE it */
-  user-select: none;
-  will-change: transform, opacity;
-  filter: blur(0.15px);
-
-  animation: noteFloat ease-in-out infinite;
-}
-
-@keyframes noteFloat {
-  0% {
-    transform: translate3d(0, 0, 0) rotate(var(--r, 0deg));
-  }
-  50% {
-    transform: translate3d(var(--drift, 10px), -22px, 0) rotate(var(--r, 0deg));
-  }
-  100% {
-    transform: translate3d(0, 0, 0) rotate(var(--r, 0deg));
+    opacity: 0.9;
   }
 }
 
@@ -108,62 +76,10 @@ body {
   }
 }
 
-.notes-bg {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
+/* If your glow cursor is a div overlay, make it click-through */
+.glow-cursor,
+.cursor-dot,
+.cursor-glow {
+  pointer-events: none !important;
 }
-
-.note {
-  position: absolute;
-  animation: noteFloat var(--dur, 12s) ease-in-out infinite;
-}
-
-@keyframes noteFloat {
-  0% {
-    transform: translateY(0) translateX(0) rotate(var(--r));
-  }
-  50% {
-    transform: translateY(calc(var(--drift) * -1)) translateX(6px)
-      rotate(calc(var(--r) + 4deg));
-  }
-  100% {
-    transform: translateY(0) translateX(0) rotate(var(--r));
-  }
-}
-
-/* Floating music notes background */
-.notes-bg {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  overflow: hidden;
-}
-
-.note {
-  position: absolute;
-  color: rgba(0, 0, 0, 0.14);
-  user-select: none;
-  opacity: 0.9;
-
-  animation-name: noteFloat;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-}
-
-@keyframes noteFloat {
-  0% {
-    transform: translate3d(0, 0, 0) rotate(var(--r, 0deg));
-  }
-  50% {
-    transform: translate3d(var(--drift, 14px), -22px, 0) rotate(var(--r, 0deg));
-    opacity: 0.6;
-  }
-  100% {
-    transform: translate3d(0, 0, 0) rotate(var(--r, 0deg));
-  }
-}
-
 
